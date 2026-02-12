@@ -1,0 +1,497 @@
+<!doctype html>
+<html lang="en" class="h-full">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Attendance Monitor</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="/_sdk/element_sdk.js"></script>
+  <script src="/_sdk/data_sdk.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'DM Sans', sans-serif; }
+    .attendance-card { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+    .attendance-card:hover { transform: translateY(-2px); }
+    .status-present { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
+    .status-absent { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); }
+    .status-late { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
+    .status-excused { background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); }
+    .tab-active { border-bottom: 3px solid; }
+    @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .animate-slide { animation: slideIn 0.3s ease-out forwards; }
+    .stat-card { backdrop-filter: blur(10px); }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: rgba(255,255,255,0.1); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.3); border-radius: 3px; }
+  </style>
+  <style>body { box-sizing: border-box; }</style>
+ </head>
+ <body class="h-full">
+  <div id="app-wrapper" class="h-full w-full overflow-auto" style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);"><!-- Header -->
+   <header class="sticky top-0 z-50 px-4 py-4" style="background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(10px); border-bottom: 1px solid rgba(255,255,255,0.1);">
+    <div class="max-w-7xl mx-auto flex items-center justify-between">
+     <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);">
+       <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+       </svg>
+      </div>
+      <div>
+       <h1 id="app-title" class="text-xl font-bold text-white">Smart Attendance Monitor</h1>
+       <p id="institution-name" class="text-xs text-slate-400">College Attendance System</p>
+      </div>
+     </div>
+     <div class="flex items-center gap-2"><span class="text-slate-400 text-sm" id="current-date"></span>
+      <div class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+     </div>
+    </div>
+   </header><!-- Navigation Tabs -->
+   <nav class="px-4 py-2" style="background: rgba(30, 41, 59, 0.5);">
+    <div class="max-w-7xl mx-auto flex gap-1"><button onclick="switchTab('dashboard')" id="tab-dashboard" class="tab-btn tab-active px-4 py-2 text-sm font-medium text-white rounded-t-lg transition-all" style="border-color: #6366f1;"> 📊 Dashboard </button> <button onclick="switchTab('mark')" id="tab-mark" class="tab-btn px-4 py-2 text-sm font-medium text-slate-400 rounded-t-lg transition-all hover:text-white"> ✏️ Mark Attendance </button> <button onclick="switchTab('records')" id="tab-records" class="tab-btn px-4 py-2 text-sm font-medium text-slate-400 rounded-t-lg transition-all hover:text-white"> 📋 Records </button> <button onclick="switchTab('students')" id="tab-students" class="tab-btn px-4 py-2 text-sm font-medium text-slate-400 rounded-t-lg transition-all hover:text-white"> 👥 Students </button>
+    </div>
+   </nav>
+   <main class="max-w-7xl mx-auto px-4 py-6"><!-- Dashboard View -->
+    <section id="view-dashboard" class="animate-slide"><!-- Stats Cards -->
+     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      <div class="stat-card rounded-2xl p-4" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(5, 150, 105, 0.1) 100%); border: 1px solid rgba(16, 185, 129, 0.3);">
+       <div class="flex items-center gap-3">
+        <div class="w-12 h-12 rounded-xl flex items-center justify-center status-present"><span class="text-2xl">✓</span>
+        </div>
+        <div>
+         <p class="text-slate-400 text-xs uppercase tracking-wide">Present</p>
+         <p id="stat-present" class="text-2xl font-bold text-emerald-400">0</p>
+        </div>
+       </div>
+      </div>
+      <div class="stat-card rounded-2xl p-4" style="background: linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(220, 38, 38, 0.1) 100%); border: 1px solid rgba(239, 68, 68, 0.3);">
+       <div class="flex items-center gap-3">
+        <div class="w-12 h-12 rounded-xl flex items-center justify-center status-absent"><span class="text-2xl">✗</span>
+        </div>
+        <div>
+         <p class="text-slate-400 text-xs uppercase tracking-wide">Absent</p>
+         <p id="stat-absent" class="text-2xl font-bold text-red-400">0</p>
+        </div>
+       </div>
+      </div>
+      <div class="stat-card rounded-2xl p-4" style="background: linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(217, 119, 6, 0.1) 100%); border: 1px solid rgba(245, 158, 11, 0.3);">
+       <div class="flex items-center gap-3">
+        <div class="w-12 h-12 rounded-xl flex items-center justify-center status-late"><span class="text-2xl">⏰</span>
+        </div>
+        <div>
+         <p class="text-slate-400 text-xs uppercase tracking-wide">Late</p>
+         <p id="stat-late" class="text-2xl font-bold text-amber-400">0</p>
+        </div>
+       </div>
+      </div>
+      <div class="stat-card rounded-2xl p-4" style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.2) 0%, rgba(79, 70, 229, 0.1) 100%); border: 1px solid rgba(99, 102, 241, 0.3);">
+       <div class="flex items-center gap-3">
+        <div class="w-12 h-12 rounded-xl flex items-center justify-center status-excused"><span class="text-2xl">📝</span>
+        </div>
+        <div>
+         <p class="text-slate-400 text-xs uppercase tracking-wide">Excused</p>
+         <p id="stat-excused" class="text-2xl font-bold text-indigo-400">0</p>
+        </div>
+       </div>
+      </div>
+     </div><!-- Attendance Rate Card -->
+     <div class="rounded-2xl p-6 mb-6" style="background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(255,255,255,0.1);">
+      <div class="flex items-center justify-between mb-4">
+       <h3 class="text-lg font-semibold text-white">Today's Attendance Rate</h3><span id="attendance-rate" class="text-3xl font-bold text-emerald-400">0%</span>
+      </div>
+      <div class="w-full h-4 rounded-full overflow-hidden" style="background: rgba(255,255,255,0.1);">
+       <div id="attendance-bar" class="h-full rounded-full transition-all duration-500" style="width: 0%; background: linear-gradient(90deg, #10b981 0%, #6366f1 100%);"></div>
+      </div>
+      <div class="flex justify-between mt-2 text-xs text-slate-500"><span>0%</span> <span>50%</span> <span>100%</span>
+      </div>
+     </div><!-- Recent Activity -->
+     <div class="rounded-2xl p-6" style="background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(255,255,255,0.1);">
+      <h3 class="text-lg font-semibold text-white mb-4">Recent Activity</h3>
+      <div id="recent-activity" class="space-y-3 max-h-64 overflow-auto">
+       <p class="text-slate-500 text-center py-8">No attendance records yet. Start marking attendance!</p>
+      </div>
+     </div>
+    </section><!-- Mark Attendance View -->
+    <section id="view-mark" class="hidden animate-slide">
+     <div class="rounded-2xl p-6" style="background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(255,255,255,0.1);">
+      <h3 class="text-lg font-semibold text-white mb-6">Mark Student Attendance</h3>
+      <form id="attendance-form" class="space-y-4">
+       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div><label for="student-id" class="block text-sm font-medium text-slate-300 mb-2">Student ID</label> <input type="text" id="student-id" required placeholder="e.g., STU001" class="w-full px-4 py-3 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all" style="background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255,255,255,0.1);">
+        </div>
+        <div><label for="student-name" class="block text-sm font-medium text-slate-300 mb-2">Student Name</label> <input type="text" id="student-name" required placeholder="Full name" class="w-full px-4 py-3 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all" style="background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255,255,255,0.1);">
+        </div>
+       </div>
+       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div><label for="course" class="block text-sm font-medium text-slate-300 mb-2">Course/Subject</label> <select id="course" required class="w-full px-4 py-3 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all" style="background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255,255,255,0.1);"> <option value="">Select Course</option> <option value="Computer Science 101">Computer Science 101</option> <option value="Mathematics 201">Mathematics 201</option> <option value="Physics 101">Physics 101</option> <option value="English Literature">English Literature</option> <option value="Business Studies">Business Studies</option> </select>
+        </div>
+        <div><label for="attendance-date" class="block text-sm font-medium text-slate-300 mb-2">Date</label> <input type="date" id="attendance-date" required class="w-full px-4 py-3 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all" style="background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255,255,255,0.1);">
+        </div>
+       </div>
+       <div><label class="block text-sm font-medium text-slate-300 mb-3">Attendance Status</label>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3"><label class="attendance-card cursor-pointer"> <input type="radio" name="status" value="Present" class="sr-only peer" checked>
+          <div class="p-4 rounded-xl text-center transition-all peer-checked:status-present" style="background: rgba(15, 23, 42, 0.8); border: 2px solid transparent;" onmouseover="this.style.borderColor='#10b981'" onmouseout="this.style.borderColor='transparent'"><span class="text-2xl block mb-1">✓</span> <span class="text-white font-medium text-sm">Present</span>
+          </div></label> <label class="attendance-card cursor-pointer"> <input type="radio" name="status" value="Absent" class="sr-only peer">
+          <div class="p-4 rounded-xl text-center transition-all peer-checked:status-absent" style="background: rgba(15, 23, 42, 0.8); border: 2px solid transparent;" onmouseover="this.style.borderColor='#ef4444'" onmouseout="this.style.borderColor='transparent'"><span class="text-2xl block mb-1">✗</span> <span class="text-white font-medium text-sm">Absent</span>
+          </div></label> <label class="attendance-card cursor-pointer"> <input type="radio" name="status" value="Late" class="sr-only peer">
+          <div class="p-4 rounded-xl text-center transition-all peer-checked:status-late" style="background: rgba(15, 23, 42, 0.8); border: 2px solid transparent;" onmouseover="this.style.borderColor='#f59e0b'" onmouseout="this.style.borderColor='transparent'"><span class="text-2xl block mb-1">⏰</span> <span class="text-white font-medium text-sm">Late</span>
+          </div></label> <label class="attendance-card cursor-pointer"> <input type="radio" name="status" value="Excused" class="sr-only peer">
+          <div class="p-4 rounded-xl text-center transition-all peer-checked:status-excused" style="background: rgba(15, 23, 42, 0.8); border: 2px solid transparent;" onmouseover="this.style.borderColor='#6366f1'" onmouseout="this.style.borderColor='transparent'"><span class="text-2xl block mb-1">📝</span> <span class="text-white font-medium text-sm">Excused</span>
+          </div></label>
+        </div>
+       </div>
+       <div><label for="notes" class="block text-sm font-medium text-slate-300 mb-2">Notes (Optional)</label> <textarea id="notes" rows="2" placeholder="Additional notes..." class="w-full px-4 py-3 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all resize-none" style="background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255,255,255,0.1);"></textarea>
+       </div><button type="submit" id="submit-btn" class="w-full py-4 rounded-xl text-white font-semibold text-lg transition-all hover:opacity-90 active:scale-[0.98] flex items-center justify-center gap-2" style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+        </svg> Record Attendance </button>
+      </form><!-- Success Message -->
+      <div id="success-message" class="hidden mt-4 p-4 rounded-xl text-center" style="background: rgba(16, 185, 129, 0.2); border: 1px solid rgba(16, 185, 129, 0.3);"><span class="text-emerald-400 font-medium">✓ Attendance recorded successfully!</span>
+      </div>
+     </div>
+    </section><!-- Records View -->
+    <section id="view-records" class="hidden animate-slide">
+     <div class="rounded-2xl p-6" style="background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(255,255,255,0.1);">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+       <h3 class="text-lg font-semibold text-white">Attendance Records</h3>
+       <div class="flex gap-2"><input type="text" id="search-records" placeholder="Search by name or ID..." class="px-4 py-2 rounded-xl text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500" style="background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255,255,255,0.1);"> <select id="filter-status" class="px-4 py-2 rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" style="background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255,255,255,0.1);"> <option value="">All Status</option> <option value="Present">Present</option> <option value="Absent">Absent</option> <option value="Late">Late</option> <option value="Excused">Excused</option> </select>
+       </div>
+      </div>
+      <div id="records-list" class="space-y-3 max-h-96 overflow-auto">
+       <p class="text-slate-500 text-center py-8">No records found. Start marking attendance!</p>
+      </div>
+      <div id="records-count" class="mt-4 text-center text-slate-500 text-sm"></div>
+     </div>
+    </section><!-- Students View -->
+    <section id="view-students" class="hidden animate-slide">
+     <div class="rounded-2xl p-6" style="background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(255,255,255,0.1);">
+      <h3 class="text-lg font-semibold text-white mb-6">Student Attendance Summary</h3>
+      <div id="students-summary" class="space-y-4">
+       <p class="text-slate-500 text-center py-8">No student data available yet.</p>
+      </div>
+     </div>
+    </section>
+   </main><!-- Delete Confirmation Modal -->
+   <div id="delete-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4" style="background: rgba(0,0,0,0.7);">
+    <div class="rounded-2xl p-6 max-w-sm w-full" style="background: #1e293b; border: 1px solid rgba(255,255,255,0.1);">
+     <h4 class="text-lg font-semibold text-white mb-2">Delete Record?</h4>
+     <p class="text-slate-400 text-sm mb-6">This action cannot be undone.</p>
+     <div class="flex gap-3"><button id="cancel-delete" class="flex-1 py-2 rounded-xl text-white font-medium transition-all hover:opacity-80" style="background: rgba(255,255,255,0.1);"> Cancel </button> <button id="confirm-delete" class="flex-1 py-2 rounded-xl text-white font-medium transition-all hover:opacity-80" style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);"> Delete </button>
+     </div>
+    </div>
+   </div>
+  </div>
+  <script>
+    // App State
+    let attendanceRecords = [];
+    let recordToDelete = null;
+
+    const defaultConfig = {
+      app_title: 'Smart Attendance Monitor',
+      institution_name: 'College Attendance System',
+      primary_color: '#6366f1',
+      secondary_color: '#1e293b',
+      text_color: '#ffffff',
+      accent_color: '#10b981',
+      surface_color: '#0f172a'
+    };
+
+    // Initialize current date
+    document.getElementById('current-date').textContent = new Date().toLocaleDateString('en-US', { 
+      weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' 
+    });
+    document.getElementById('attendance-date').value = new Date().toISOString().split('T')[0];
+
+    // Tab Switching
+    function switchTab(tab) {
+      document.querySelectorAll('[id^="view-"]').forEach(v => v.classList.add('hidden'));
+      document.querySelectorAll('.tab-btn').forEach(t => {
+        t.classList.remove('tab-active');
+        t.style.borderColor = 'transparent';
+        t.classList.remove('text-white');
+        t.classList.add('text-slate-400');
+      });
+      
+      document.getElementById(`view-${tab}`).classList.remove('hidden');
+      const activeTab = document.getElementById(`tab-${tab}`);
+      activeTab.classList.add('tab-active', 'text-white');
+      activeTab.classList.remove('text-slate-400');
+      activeTab.style.borderColor = '#6366f1';
+    }
+
+    // Data Handler
+    const dataHandler = {
+      onDataChanged(data) {
+        attendanceRecords = data;
+        updateDashboard();
+        renderRecords();
+        renderStudentsSummary();
+        renderRecentActivity();
+      }
+    };
+
+    // Update Dashboard Stats
+    function updateDashboard() {
+      const today = new Date().toISOString().split('T')[0];
+      const todayRecords = attendanceRecords.filter(r => r.date === today);
+      
+      const present = todayRecords.filter(r => r.status === 'Present').length;
+      const absent = todayRecords.filter(r => r.status === 'Absent').length;
+      const late = todayRecords.filter(r => r.status === 'Late').length;
+      const excused = todayRecords.filter(r => r.status === 'Excused').length;
+      
+      document.getElementById('stat-present').textContent = present;
+      document.getElementById('stat-absent').textContent = absent;
+      document.getElementById('stat-late').textContent = late;
+      document.getElementById('stat-excused').textContent = excused;
+      
+      const total = todayRecords.length;
+      const rate = total > 0 ? Math.round(((present + late) / total) * 100) : 0;
+      document.getElementById('attendance-rate').textContent = `${rate}%`;
+      document.getElementById('attendance-bar').style.width = `${rate}%`;
+    }
+
+    // Render Recent Activity
+    function renderRecentActivity() {
+      const container = document.getElementById('recent-activity');
+      const recent = [...attendanceRecords].sort((a, b) => 
+        new Date(b.date + ' ' + (b.time_in || '00:00')) - new Date(a.date + ' ' + (a.time_in || '00:00'))
+      ).slice(0, 5);
+      
+      if (recent.length === 0) {
+        container.innerHTML = '<p class="text-slate-500 text-center py-8">No attendance records yet. Start marking attendance!</p>';
+        return;
+      }
+      
+      container.innerHTML = recent.map(r => `
+        <div class="flex items-center gap-3 p-3 rounded-xl transition-all hover:bg-white/5" style="background: rgba(15, 23, 42, 0.5);">
+          <div class="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold" 
+            style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);">
+            ${r.student_name.charAt(0).toUpperCase()}
+          </div>
+          <div class="flex-1 min-w-0">
+            <p class="text-white font-medium text-sm truncate">${r.student_name}</p>
+            <p class="text-slate-500 text-xs">${r.course} • ${r.date}</p>
+          </div>
+          <span class="px-3 py-1 rounded-full text-xs font-medium text-white status-${r.status.toLowerCase()}">${r.status}</span>
+        </div>
+      `).join('');
+    }
+
+    // Render Records
+    function renderRecords() {
+      const container = document.getElementById('records-list');
+      const searchTerm = document.getElementById('search-records').value.toLowerCase();
+      const statusFilter = document.getElementById('filter-status').value;
+      
+      let filtered = attendanceRecords.filter(r => {
+        const matchesSearch = r.student_name.toLowerCase().includes(searchTerm) || 
+                              r.student_id.toLowerCase().includes(searchTerm);
+        const matchesStatus = !statusFilter || r.status === statusFilter;
+        return matchesSearch && matchesStatus;
+      });
+      
+      filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
+      
+      if (filtered.length === 0) {
+        container.innerHTML = '<p class="text-slate-500 text-center py-8">No records found.</p>';
+        document.getElementById('records-count').textContent = '';
+        return;
+      }
+      
+      container.innerHTML = filtered.map(r => `
+        <div class="flex items-center gap-3 p-4 rounded-xl transition-all hover:bg-white/5" style="background: rgba(15, 23, 42, 0.5);" data-id="${r.__backendId}">
+          <div class="w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold" 
+            style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);">
+            ${r.student_name.charAt(0).toUpperCase()}
+          </div>
+          <div class="flex-1 min-w-0">
+            <p class="text-white font-medium truncate">${r.student_name}</p>
+            <p class="text-slate-500 text-sm">${r.student_id} • ${r.course}</p>
+            <p class="text-slate-600 text-xs">${r.date} ${r.time_in ? '@ ' + r.time_in : ''}</p>
+          </div>
+          <span class="px-3 py-1 rounded-full text-xs font-medium text-white status-${r.status.toLowerCase()}">${r.status}</span>
+          <button onclick="showDeleteModal('${r.__backendId}')" class="p-2 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-all">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+            </svg>
+          </button>
+        </div>
+      `).join('');
+      
+      document.getElementById('records-count').textContent = `Showing ${filtered.length} of ${attendanceRecords.length} records`;
+    }
+
+    // Render Students Summary
+    function renderStudentsSummary() {
+      const container = document.getElementById('students-summary');
+      
+      const studentMap = new Map();
+      attendanceRecords.forEach(r => {
+        if (!studentMap.has(r.student_id)) {
+          studentMap.set(r.student_id, { 
+            name: r.student_name, 
+            id: r.student_id,
+            present: 0, absent: 0, late: 0, excused: 0, total: 0 
+          });
+        }
+        const student = studentMap.get(r.student_id);
+        student.total++;
+        student[r.status.toLowerCase()]++;
+      });
+      
+      if (studentMap.size === 0) {
+        container.innerHTML = '<p class="text-slate-500 text-center py-8">No student data available yet.</p>';
+        return;
+      }
+      
+      const students = Array.from(studentMap.values()).sort((a, b) => b.total - a.total);
+      
+      container.innerHTML = students.map(s => {
+        const rate = s.total > 0 ? Math.round(((s.present + s.late) / s.total) * 100) : 0;
+        return `
+          <div class="p-4 rounded-xl" style="background: rgba(15, 23, 42, 0.5);">
+            <div class="flex items-center gap-3 mb-3">
+              <div class="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm" 
+                style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);">
+                ${s.name.charAt(0).toUpperCase()}
+              </div>
+              <div class="flex-1">
+                <p class="text-white font-medium">${s.name}</p>
+                <p class="text-slate-500 text-xs">${s.id}</p>
+              </div>
+              <span class="text-lg font-bold ${rate >= 75 ? 'text-emerald-400' : rate >= 50 ? 'text-amber-400' : 'text-red-400'}">${rate}%</span>
+            </div>
+            <div class="flex gap-2 text-xs">
+              <span class="px-2 py-1 rounded-full text-emerald-400" style="background: rgba(16, 185, 129, 0.2);">✓ ${s.present}</span>
+              <span class="px-2 py-1 rounded-full text-red-400" style="background: rgba(239, 68, 68, 0.2);">✗ ${s.absent}</span>
+              <span class="px-2 py-1 rounded-full text-amber-400" style="background: rgba(245, 158, 11, 0.2);">⏰ ${s.late}</span>
+              <span class="px-2 py-1 rounded-full text-indigo-400" style="background: rgba(99, 102, 241, 0.2);">📝 ${s.excused}</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Delete Modal
+    function showDeleteModal(id) {
+      recordToDelete = attendanceRecords.find(r => r.__backendId === id);
+      document.getElementById('delete-modal').classList.remove('hidden');
+    }
+
+    document.getElementById('cancel-delete').addEventListener('click', () => {
+      document.getElementById('delete-modal').classList.add('hidden');
+      recordToDelete = null;
+    });
+
+    document.getElementById('confirm-delete').addEventListener('click', async () => {
+      if (recordToDelete) {
+        const btn = document.getElementById('confirm-delete');
+        btn.textContent = 'Deleting...';
+        btn.disabled = true;
+        
+        const result = await window.dataSdk.delete(recordToDelete);
+        if (!result.isOk) {
+          console.error('Failed to delete record');
+        }
+        
+        btn.textContent = 'Delete';
+        btn.disabled = false;
+        document.getElementById('delete-modal').classList.add('hidden');
+        recordToDelete = null;
+      }
+    });
+
+    // Form Submit
+    document.getElementById('attendance-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      if (attendanceRecords.length >= 999) {
+        document.getElementById('success-message').innerHTML = '<span class="text-amber-400 font-medium">⚠️ Maximum limit of 999 records reached. Please delete some records first.</span>';
+        document.getElementById('success-message').classList.remove('hidden');
+        setTimeout(() => document.getElementById('success-message').classList.add('hidden'), 3000);
+        return;
+      }
+      
+      const btn = document.getElementById('submit-btn');
+      btn.innerHTML = '<svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Recording...';
+      btn.disabled = true;
+      
+      const record = {
+        student_id: document.getElementById('student-id').value.trim(),
+        student_name: document.getElementById('student-name').value.trim(),
+        course: document.getElementById('course').value,
+        date: document.getElementById('attendance-date').value,
+        status: document.querySelector('input[name="status"]:checked').value,
+        time_in: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+        notes: document.getElementById('notes').value.trim()
+      };
+      
+      const result = await window.dataSdk.create(record);
+      
+      btn.innerHTML = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Record Attendance';
+      btn.disabled = false;
+      
+      if (result.isOk) {
+        document.getElementById('success-message').innerHTML = '<span class="text-emerald-400 font-medium">✓ Attendance recorded successfully!</span>';
+        document.getElementById('success-message').classList.remove('hidden');
+        document.getElementById('attendance-form').reset();
+        document.getElementById('attendance-date').value = new Date().toISOString().split('T')[0];
+        document.querySelector('input[name="status"][value="Present"]').checked = true;
+        setTimeout(() => document.getElementById('success-message').classList.add('hidden'), 3000);
+      } else {
+        document.getElementById('success-message').innerHTML = '<span class="text-red-400 font-medium">✗ Failed to record attendance. Please try again.</span>';
+        document.getElementById('success-message').classList.remove('hidden');
+        setTimeout(() => document.getElementById('success-message').classList.add('hidden'), 3000);
+      }
+    });
+
+    // Search and Filter
+    document.getElementById('search-records').addEventListener('input', renderRecords);
+    document.getElementById('filter-status').addEventListener('change', renderRecords);
+
+    // Element SDK
+    async function onConfigChange(config) {
+      const title = config.app_title || defaultConfig.app_title;
+      const institution = config.institution_name || defaultConfig.institution_name;
+      
+      document.getElementById('app-title').textContent = title;
+      document.getElementById('institution-name').textContent = institution;
+    }
+
+    function mapToCapabilities(config) {
+      return {
+        recolorables: [],
+        borderables: [],
+        fontEditable: undefined,
+        fontSizeable: undefined
+      };
+    }
+
+    function mapToEditPanelValues(config) {
+      return new Map([
+        ['app_title', config.app_title || defaultConfig.app_title],
+        ['institution_name', config.institution_name || defaultConfig.institution_name]
+      ]);
+    }
+
+    // Initialize
+    async function init() {
+      if (window.elementSdk) {
+        await window.elementSdk.init({
+          defaultConfig,
+          onConfigChange,
+          mapToCapabilities,
+          mapToEditPanelValues
+        });
+      }
+      
+      if (window.dataSdk) {
+        const result = await window.dataSdk.init(dataHandler);
+        if (!result.isOk) {
+          console.error('Failed to initialize data SDK');
+        }
+      }
+    }
+
+    init();
+  </script>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9cca30daf3467efa',t:'MTc3MDg3OTQzNi4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+          </html>
